@@ -1,0 +1,91 @@
+# NMakefile
+# SAASoundEngine - SAASound FmEngineApi ラッパー MSVC NMake ビルドスクリプト
+#
+# 使い方 (Visual Studio Developer Command Prompt で):
+#   nmake /f NMakefile
+#   nmake /f NMakefile clean
+#
+# SAASound は extern\SAASound\ に git submodule として配置すること:
+#   git submodule update --init --recursive
+
+SAASOUND_ROOT = extern\SAASound
+
+CC = cl
+LD = link
+
+CFLAGS = /nologo /std:c++17 /EHsc /O2 /W3 /utf-8 \
+         /DFMENGINE_EXPORTS \
+         /DHAVE_CONFIG_H=1 \
+         /D_CRT_SECURE_NO_WARNINGS \
+         /D_CRT_NONSTDC_NO_WARNINGS \
+         /DUNICODE /D_UNICODE \
+         /I"src" \
+         /I"$(SAASOUND_ROOT)\include" \
+         /I"$(SAASOUND_ROOT)\src" \
+         /I"$(SAASOUND_ROOT)\src\minIni" \
+         /c
+
+OBJS = \
+    build\SAASoundEngine.obj \
+    build\SAAAmp.obj \
+    build\SAADevice.obj \
+    build\SAAEnv.obj \
+    build\SAAFreq.obj \
+    build\SAAImpl.obj \
+    build\SAANoise.obj \
+    build\SAASndC.obj \
+    build\SAASound.obj \
+    build\SAAConfig.obj \
+    build\minIni.obj
+
+TARGET = build\SAASoundEngine.dll
+
+all: build_dir $(TARGET)
+
+build_dir:
+    @if not exist build mkdir build
+
+$(TARGET): $(OBJS)
+    $(LD) /nologo /DLL /OUT:$(TARGET) $(OBJS)
+    @echo.
+    @echo Build complete: $(TARGET)
+
+build\SAASoundEngine.obj: src\SAASoundEngine.cpp src\FmEngineApi.h
+    $(CC) $(CFLAGS) /Fo"build\SAASoundEngine.obj" src\SAASoundEngine.cpp
+
+build\SAAAmp.obj: $(SAASOUND_ROOT)\src\SAAAmp.cpp
+    $(CC) $(CFLAGS) /Fo"build\SAAAmp.obj" $(SAASOUND_ROOT)\src\SAAAmp.cpp
+
+build\SAADevice.obj: $(SAASOUND_ROOT)\src\SAADevice.cpp
+    $(CC) $(CFLAGS) /Fo"build\SAADevice.obj" $(SAASOUND_ROOT)\src\SAADevice.cpp
+
+build\SAAEnv.obj: $(SAASOUND_ROOT)\src\SAAEnv.cpp
+    $(CC) $(CFLAGS) /Fo"build\SAAEnv.obj" $(SAASOUND_ROOT)\src\SAAEnv.cpp
+
+build\SAAFreq.obj: $(SAASOUND_ROOT)\src\SAAFreq.cpp
+    $(CC) $(CFLAGS) /Fo"build\SAAFreq.obj" $(SAASOUND_ROOT)\src\SAAFreq.cpp
+
+build\SAAImpl.obj: $(SAASOUND_ROOT)\src\SAAImpl.cpp
+    $(CC) $(CFLAGS) /Fo"build\SAAImpl.obj" $(SAASOUND_ROOT)\src\SAAImpl.cpp
+
+build\SAANoise.obj: $(SAASOUND_ROOT)\src\SAANoise.cpp
+    $(CC) $(CFLAGS) /Fo"build\SAANoise.obj" $(SAASOUND_ROOT)\src\SAANoise.cpp
+
+build\SAASndC.obj: $(SAASOUND_ROOT)\src\SAASndC.cpp
+    $(CC) $(CFLAGS) /Fo"build\SAASndC.obj" $(SAASOUND_ROOT)\src\SAASndC.cpp
+
+build\SAASound.obj: $(SAASOUND_ROOT)\src\SAASound.cpp
+    $(CC) $(CFLAGS) /Fo"build\SAASound.obj" $(SAASOUND_ROOT)\src\SAASound.cpp
+
+build\SAAConfig.obj: $(SAASOUND_ROOT)\src\SAAConfig.cpp
+    $(CC) $(CFLAGS) /Fo"build\SAAConfig.obj" $(SAASOUND_ROOT)\src\SAAConfig.cpp
+
+build\minIni.obj: $(SAASOUND_ROOT)\src\minIni\minIni.c
+    $(CC) $(CFLAGS) /Fo"build\minIni.obj" $(SAASOUND_ROOT)\src\minIni\minIni.c
+
+clean:
+    @if exist build\*.obj del /Q build\*.obj
+    @if exist build\SAASoundEngine.dll del /Q build\SAASoundEngine.dll
+    @if exist build\SAASoundEngine.lib del /Q build\SAASoundEngine.lib
+    @if exist build\SAASoundEngine.exp del /Q build\SAASoundEngine.exp
+    @echo Cleaned.
