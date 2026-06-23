@@ -27,7 +27,7 @@ SAASoundEngine/
 ## セットアップ
 
 ```bash
-git clone https://github.com/your-org/SAASoundEngine
+git clone https://github.com/madscient/SAASoundEngine
 cd SAASoundEngine
 git submodule update --init --recursive
 ```
