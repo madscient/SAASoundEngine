@@ -18,7 +18,7 @@ SAASoundEngine/
 │   └── SAASound/               ← git submodule (stripwax/SAASound)
 └── src/
     ├── SAASoundEngine.cpp      ← ラッパー実装本体
-    ├── FmEngineApi.h           ← FmEngineApi 仕様ヘッダ (FMEngineTest からコピー)
+    ├── FmEngineApi.h           ← FmEngineApi 仕様ヘッダ (各エンジン共通)
     └── saasound_cmake_config.h ← SAASound 用ビルド設定
 ```
 
@@ -89,7 +89,7 @@ Sample rate: 48000 Hz
 Supported chips (1): SAA
 
 [SAA] chip_id=0, native_rate=15625 Hz
-  CH0 261Hz (oct=4 F=0xFC) pan=L
+  CH0 CH0 261Hz (oct=4 F=0xFC) pan=L
   ...
 ```
 
@@ -100,12 +100,20 @@ Supported chips (1): SAA
 | 項目 | 内容 |
 |---|---|
 | 対応チップ | `"SAA"` のみ (SAA1099) |
-| クロック | デフォルト 8 MHz (`clock=0` 指定時も同様) |
+| クロック | `FmEngine_AddChip` の `clock` で必ず指定する。エンジンは既定のクロックを持たず、0 は `FM_ERR_INVALID_ARG` |
+| 複数の SAA チップ | すべて同じクロックで使う (下記) |
 | ネイティブレート | `clock / 512` (8 MHz → 15625 Hz) |
 | `port` 引数 | 無視 (SAA1099 はポート概念なし) |
-| `SetMemory` | `FM_ERR_UNAVAILABLE` (外部メモリなし) |
+| `SetMemory` / `GetMemorySize` | `FM_ERR_UNAVAILABLE` / 0 (外部メモリなし) |
+| 任意シンボル | 部位ゲイン (`FmEngine_SetPartGain` / `FmEngine_GetPartGain` / `FmEngine_GetPartMask`) と `FmEngine_SetMemoryEx` はエクスポートしない。SAA1099 は出力が 1 系統で、外部メモリを持たない |
 | バッファ変換 | `GenerateMany` の 16bit LE stereo interleaved → float32 deinterleaved |
 | `SAASound.cfg` | 存在しない場合はデフォルト値で動作 (ログ無効・highpass=on・boost=1) |
+
+### 複数の SAA チップのクロック
+
+SAASound はトーンの周波数テーブルを DLL 全体で 1 つだけ持ちます。そのため、クロックの違う SAA チップを使うと、すべてのチップのトーンの音程が、最後に追加したチップのクロックに従います。別のエンジン (`FmEngine_Create` で作ったハンドル) に追加したチップも同じです。
+
+複数の SAA チップを使うときは、すべて同じクロックを指定してください。
 
 ---
 
@@ -113,4 +121,4 @@ Supported chips (1): SAA
 
 - **SAASoundEngine.cpp**: MIT
 - **SAASound** (`extern/SAASound`): 独自ライセンス ([LICENCE](extern/SAASound/LICENCE) 参照)
-- **FmEngineApi.h**: FMEngineTest の MIT ライセンスに準拠
+- **FmEngineApi.h**: [YMEngine](https://github.com/madscient/YMEngine) の MIT ライセンスに準拠

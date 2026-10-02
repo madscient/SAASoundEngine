@@ -1,37 +1,11 @@
 // SAASoundEngine.cpp
 // SAASound (SAA1099) の FmEngineApi ラッパー実装
 //
-// FmEngineApi 仕様:
-//   - チップ名 "SAA" のみサポート
-//   - port 引数は無視 (SAA1099 は port 概念なし)
-//   - SetMemory / GetMemorySize は FM_ERR_UNAVAILABLE を返す
-//   - GenerateMany の 16bit signed LE stereo interleaved → float32 deinterleaved 変換
-//   - スレッドセーフ: Write / SetGain は atomic でなくても FmEngineTest の
-//     使用パターン (ストリーム開始後にメインスレッドから 1 チップ分だけ書く) では問題なし。
-//     より厳密にしたい場合は std::mutex を追加のこと。
-//
-// ビルド方法 (例):
-//   Windows (MSVC cl /std:c++17 /EHsc):
-//     cl /std:c++17 /EHsc /O2 /LD /DFMENGINE_EXPORTS /DHAVE_CONFIG_H=1
-//        /I../SAASound/include /I../SAASound/src /I../SAASound/src/minIni /Isrc
-//        SAASoundEngine.cpp
-//        ../SAASound/src/SAASound.cpp ../SAASound/src/SAAImpl.cpp
-//        ../SAASound/src/SAADevice.cpp ../SAASound/src/SAAAmp.cpp
-//        ../SAASound/src/SAAFreq.cpp ../SAASound/src/SAANoise.cpp
-//        ../SAASound/src/SAAEnv.cpp   ../SAASound/src/SAASndC.cpp
-//        ../SAASound/src/SAAConfig.cpp ../SAASound/src/minIni/minIni.c
-//        /Fe:SAASoundEngine.dll /link /DLL
-//
-//   Linux (g++ -std=c++17):
-//     g++ -std=c++17 -O2 -shared -fPIC -DFMENGINE_EXPORTS -DHAVE_CONFIG_H=1
-//         -I../SAASound/include -I../SAASound/src -I../SAASound/src/minIni -Isrc
-//         SAASoundEngine.cpp
-//         ../SAASound/src/SAASound.cpp ../SAASound/src/SAAImpl.cpp
-//         ../SAASound/src/SAADevice.cpp ../SAASound/src/SAAAmp.cpp
-//         ../SAASound/src/SAAFreq.cpp ../SAASound/src/SAANoise.cpp
-//         ../SAASound/src/SAAEnv.cpp   ../SAASound/src/SAASndC.cpp
-//         ../SAASound/src/SAAConfig.cpp ../SAASound/src/minIni/minIni.c
-//         -o libSAASoundEngine.so
+//   - port 引数は無視する (SAA1099 にはポートの概念が無い)
+//   - 任意シンボル (部位ゲイン、FmEngine_SetMemoryEx) はエクスポートしない。
+//     SAA1099 は出力が 1 系統で、外部メモリのバスも無いため
+//   - SAASound の GenerateMany は 16bit signed LE stereo interleaved で出力するので、
+//     float32 の L/R 別バッファに変換する
 
 #include "FmEngineApi.h"       // FmEngineApi 仕様ヘッダ
 #include "SAASound.h"          // SAASound C++ API
@@ -40,15 +14,14 @@
 #include <cstring>
 #include <vector>
 #include <string>
-#include <atomic>
 #include <memory>
+#include <mutex>
 #include <algorithm>
 
 // =========================================================
 //  定数
 // =========================================================
 static const char* const kChipName  = "SAA";
-static const uint32_t    kSaaClock  = 8000000u;  // SAA1099 標準クロック 8 MHz
 
 // =========================================================
 //  チップスロット
@@ -60,7 +33,7 @@ struct ChipSlot {
     float                gain_l = 1.0f;
     float                gain_r = 1.0f;
 
-    ChipSlot() : clock(kSaaClock), saa(nullptr) {}
+    ChipSlot() : clock(0), saa(nullptr) {}
     ~ChipSlot() {
         if (saa) {
             DestroyCSAASound(saa);
@@ -84,6 +57,10 @@ struct ChipSlot {
 struct FmEngineOpaque {
     uint32_t             sample_rate;
     std::vector<ChipSlot> chips;       // AddChip で追加されたスロット
+
+    // 仕様がオーディオコールバックとの並行呼び出しを認めているのは
+    // Write / SetGain / GetGain だけなので、Generate とこの 3 つの間だけを排他する
+    std::mutex           lock;
 
     // GenerateMany が出力する 16bit LE stereo interleaved バッファ
     std::vector<uint8_t> pcm_buf;
@@ -137,7 +114,8 @@ FMENGINE_API FmResult FMENGINE_CALL FmEngine_AddChip(
     FmEngineHandle engine, const char* name, uint32_t clock, uint32_t* out_id)
 {
     auto* eng = as_eng(engine);
-    if (!eng || !name) return FM_ERR_INVALID_ARG;
+    // エンジンは既定のクロックを持たないので、0 を標準値に読み替えない
+    if (!eng || !name || clock == 0) return FM_ERR_INVALID_ARG;
 
     if (std::string(name) != kChipName)
         return FM_ERR_UNKNOWN_CHIP;
@@ -146,9 +124,7 @@ FMENGINE_API FmResult FMENGINE_CALL FmEngine_AddChip(
     LPCSAASOUND saa = CreateCSAASound();
     if (!saa) return FM_ERR_ALLOC;
 
-    // クロック設定 (0 → 標準クロック)
-    uint32_t effective_clock = (clock == 0) ? kSaaClock : clock;
-    saa->SetClockRate(effective_clock);
+    saa->SetClockRate(clock);
     saa->SetSampleRate(eng->sample_rate);
 
     // フィルタ/オーバーサンプル設定
@@ -161,7 +137,7 @@ FMENGINE_API FmResult FMENGINE_CALL FmEngine_AddChip(
     // チップ登録
     ChipSlot slot;
     slot.name  = kChipName;
-    slot.clock = effective_clock;
+    slot.clock = clock;
     slot.saa   = saa;
 
     uint32_t id = static_cast<uint32_t>(eng->chips.size());
@@ -213,6 +189,7 @@ FMENGINE_API FmResult FMENGINE_CALL FmEngine_Write(
     auto& slot = eng->chips[chip_id];
     if (!slot.saa) return FM_ERR_INVALID_ARG;
 
+    std::lock_guard<std::mutex> guard(eng->lock);
     slot.saa->WriteAddressData(reg, value);
     return FM_OK;
 }
@@ -225,6 +202,7 @@ FMENGINE_API FmResult FMENGINE_CALL FmEngine_SetGain(
 {
     auto* eng = as_eng(engine);
     if (!eng || chip_id >= eng->chips.size()) return FM_ERR_INVALID_ARG;
+    std::lock_guard<std::mutex> guard(eng->lock);
     eng->chips[chip_id].gain_l = gain_l;
     eng->chips[chip_id].gain_r = gain_r;
     return FM_OK;
@@ -236,6 +214,7 @@ FMENGINE_API FmResult FMENGINE_CALL FmEngine_GetGain(
 {
     auto* eng = as_eng(engine);
     if (!eng || chip_id >= eng->chips.size()) return FM_ERR_INVALID_ARG;
+    std::lock_guard<std::mutex> guard(eng->lock);
     if (out_gain_l) *out_gain_l = eng->chips[chip_id].gain_l;
     if (out_gain_r) *out_gain_r = eng->chips[chip_id].gain_r;
     return FM_OK;
@@ -267,6 +246,8 @@ FMENGINE_API FmResult FMENGINE_CALL FmEngine_Generate(
 {
     auto* eng = as_eng(engine);
     if (!eng || !out_l || !out_r || samples == 0) return FM_ERR_INVALID_ARG;
+
+    std::lock_guard<std::mutex> guard(eng->lock);
 
     // 出力バッファをゼロクリア
     std::fill(out_l, out_l + samples, 0.0f);
