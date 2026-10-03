@@ -33,12 +33,11 @@ static const uint32_t    kSaaClock  = 8000000u;
 // =========================================================
 struct ChipSlot {
     std::string          name;         // "SAA"
-    uint32_t             clock;        // マスタークロック (Hz)
     LPCSAASOUND          saa;          // SAASound オブジェクト
     float                gain_l = 1.0f;
     float                gain_r = 1.0f;
 
-    ChipSlot() : clock(0), saa(nullptr) {}
+    ChipSlot() : saa(nullptr) {}
     ~ChipSlot() {
         if (saa) {
             DestroyCSAASound(saa);
@@ -49,7 +48,7 @@ struct ChipSlot {
     ChipSlot(const ChipSlot&) = delete;
     ChipSlot& operator=(const ChipSlot&) = delete;
     ChipSlot(ChipSlot&& o) noexcept
-        : name(std::move(o.name)), clock(o.clock), saa(o.saa),
+        : name(std::move(o.name)), saa(o.saa),
           gain_l(o.gain_l), gain_r(o.gain_r)
     {
         o.saa = nullptr;
@@ -144,7 +143,6 @@ FMENGINE_API FmResult FMENGINE_CALL FmEngine_AddChip(
     // チップ登録
     ChipSlot slot;
     slot.name  = kChipName;
-    slot.clock = clock;
     slot.saa   = saa;
 
     uint32_t id = static_cast<uint32_t>(eng->chips.size());
@@ -163,17 +161,6 @@ FMENGINE_API const char* FMENGINE_CALL FmEngine_GetChipName(
     auto* eng = as_eng(engine);
     if (!eng || chip_id >= eng->chips.size()) return nullptr;
     return eng->chips[chip_id].name.c_str();
-}
-
-FMENGINE_API uint32_t FMENGINE_CALL FmEngine_GetNativeRate(
-    FmEngineHandle engine, uint32_t chip_id)
-{
-    auto* eng = as_eng(engine);
-    if (!eng || chip_id >= eng->chips.size()) return 0;
-    // SAA1099 のネイティブレートはクロック / 512
-    // (8MHz → 15625 Hz. 実際の出力は oversample 後のサンプルレートなので
-    //  チップの発音周波数基準として clock/512 を返す)
-    return eng->chips[chip_id].clock / 512u;
 }
 
 FMENGINE_API uint32_t FMENGINE_CALL FmEngine_GetSampleRate(FmEngineHandle engine)

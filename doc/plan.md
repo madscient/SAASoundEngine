@@ -8,22 +8,19 @@ AI 向けの文書。決定の根拠と前提、見送った案、確かめた�
 
 ## §0 現在地
 
-- FmEngineApi の改訂に、FMEngineTest `0c22d67` まで追随した（§2、§4）
+- FmEngineApi の改訂に、FMEngineTest `ca502c5` まで追随した（§2、§4、§6）
 - `FmEngine_AddChip` は clock が 8,000,000 のときだけ受け付ける（§5）
-- **次の一手: FMEngineTest が `0c22d67` の後に API を改訂している（`831947d`
-  「Remove FmEngine_GetNativeRate from the API」。ヘッダの blob は `7deb007`）。未追随。
-  利用者に確認してから追随する**
-- 未決: ハイパスフィルタの状態の共有（§3.3）
+- 未決: ハイパスフィルタの状態の共有（§3.3）。利用者に確認する
 
 ## §1 仕様の出どころ
 
 | 対象 | 正 | 時点 |
 |---|---|---|
-| API の仕様 | madscient/FMEngineTest `docs/FmEngineApi.md` | `0c22d67` |
-| 各エンジンに求める対応 | madscient/FMEngineTest `docs/CHANGELOG.md` | `0c22d67` |
-| ヘッダ | madscient/FMEngineTest `include/FmEngineApi.h`（本リポジトリの `src/FmEngineApi.h` はその写し） | `0c22d67` |
+| API の仕様 | madscient/FMEngineTest `docs/FmEngineApi.md` | `ca502c5` |
+| 各エンジンに求める対応 | madscient/FMEngineTest `docs/CHANGELOG.md` | `ca502c5` |
+| ヘッダ | madscient/FMEngineTest `include/FmEngineApi.h`（本リポジトリの `src/FmEngineApi.h` はその写し） | `ca502c5`（最後に変わったのは `831947d`） |
 
-ヘッダは一字も変えていない（**確認済み**: `git hash-object` が写し元の blob `206f723` と一致）。
+ヘッダは一字も変えていない（**確認済み**: `git hash-object` が写し元の blob `7deb007` と一致）。
 置き場所は `src/` のままにした（ビルド設定の include パスを変えずに済む）。
 
 FMEngineTest のコミットは、2026-10-03 に同じ内容のまま別のハッシュになった。この文書の参照は
@@ -316,3 +313,50 @@ SAA1099 は仕様の部位の表に無い。§2.2 の判断と同じで、関数
   （変更前の DLL は受け付けて native_rate=7812 で鳴らしていた）
 
 **未検証**: Linux / macOS でのビルド、`NMakefile` でのビルド。
+
+## §6 2026-10-03 FmEngineApi の改訂（FmEngine_GetNativeRate の廃止）への追随
+
+読んだ改訂: FMEngineTest `831947d`（時点は `ca502c5`）。`FmEngine_GetNativeRate` が仕様から外れ、
+必須シンボルは 12 個から 11 個になった。理由は、返す値の意味が定まっておらずエンジンによって
+違うことと、アプリケーションが呼んでいないこと（FMEngineTest の `docs/CHANGELOG.md`）。
+
+### 6.1 ヘッダを写し直す
+
+`src/FmEngineApi.h` を FMEngineTest `ca502c5` の `include/FmEngineApi.h` の写しにした（§1）。
+
+### 6.2 FmEngine_GetNativeRate のエクスポートをやめる
+
+- 根拠: FMEngineTest の `docs/CHANGELOG.md` の「エンジンとアプリケーション側の対応」が、10 本の
+  エンジンに「`FmEngine_GetNativeRate` のエクスポートをやめる」を求めている。仕様は、残していても
+  準拠とする
+- 利用者の決定（2026-10-03）: 追随する
+- 実装: `FmEngine_GetNativeRate`（clock / 512 を返していた）と、それだけが読んでいた `ChipSlot` の
+  `clock` を消した
+- 前提: 呼び出し側が `FmEngine_GetNativeRate` を必須として読まないこと（`831947d` 以降の仕様）
+- 影響: `831947d` より前の FMEngineTest は、この DLL をロードできない（**確認済み**: §6.3）。
+  madscient/FitomEmuIF `75d9542` と madscient/Y8960Sequencer `13050cb` は、読み込むシンボルの
+  一覧に `FmEngine_GetNativeRate` が無い（**未検証**: ソースを読んだだけ）
+- 見送った案: エクスポートを残す。理由: 仕様の CHANGELOG がやめることを求めている。返していた値
+  （clock / 512）に、仕様上の意味が無い
+- やり直しの値段: 戻すのは `src/SAASoundEngine.cpp` に関数 1 つ。ヘッダに宣言が無くなったので、
+  宣言もエンジン側に書くことになる
+
+`README.md` は、起動時出力の例から `native_rate=` を消し、「設計メモ」の「ネイティブレート」の
+行を消した。
+
+### 6.3 確認
+
+**確認済み**（MSVC 19.51 で、変更前 `f7f33c3` と変更後の DLL を、§4.4 のハーネスを新しい
+ヘッダに合わせて直して叩いた）:
+
+- 「廃止された 3 シンボル（`GetMemorySize`、`GetPartMask`、`GetNativeRate`）をエクスポートして
+  いない」が、変更前の DLL で落ち、変更後の DLL で通った。変更後は必須 11 シンボルがある
+- §5 の clock の検査は、変更後もすべて通った
+- 8 MHz で鳴らした出力が、変更前と変更後でバイト一致（§2.5 のものとも一致）
+- FMEngineTest `ca502c5` をビルドし（configure で「header and spec list the same 19 symbols」）、
+  `saa.json` を WAV に書き出した。変更前の DLL と変更後の DLL の WAV がバイト一致し、§4.4 の
+  WAV とも一致。チップのログは `[SAA] chip_id=0` になる
+- FMEngineTest `0c22d67` は、変更後の DLL を `FmEngine_GetNativeRate not found in DLL` で
+  ロードできない
+
+**未検証**: Linux / macOS でのビルド、`NMakefile` でのビルド、FMEngineTest のリアルタイム再生。
