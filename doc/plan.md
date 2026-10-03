@@ -8,24 +8,27 @@ AI 向けの文書。決定の根拠と前提、見送った案、確かめた�
 
 ## §0 現在地
 
-- FmEngineApi の改訂（FMEngineTest `866f4a3`、YMEngine `7d8ed2d`）に追随した（§2）
+- FmEngineApi の改訂に、FMEngineTest `20c4923` まで追随した（§2、§4）
 - **次の一手: §3（クロックの違う SAA チップを混ぜたときの扱い）を利用者に確認する**
 
 ## §1 仕様の出どころ
 
 | 対象 | 正 | 時点 |
 |---|---|---|
-| API の仕様 | madscient/FMEngineTest `docs/FmEngineApi.md` | `866f4a3` |
-| ヘッダ | madscient/YMEngine `src/FmEngineApi.h`（本リポジトリの `src/FmEngineApi.h` はその写し） | `7d8ed2d` |
+| API の仕様 | madscient/FMEngineTest `docs/FmEngineApi.md` | `20c4923` |
+| 各エンジンに求める対応 | madscient/FMEngineTest `docs/CHANGELOG.md` | `20c4923` |
+| ヘッダ | madscient/FMEngineTest `include/FmEngineApi.h`（本リポジトリの `src/FmEngineApi.h` はその写し） | `20c4923` |
 
-ヘッダは一字も変えていない（**確認済み**: `git hash-object` が写し元の blob `6fc64fe` と一致）。
+ヘッダは一字も変えていない（**確認済み**: `git hash-object` が写し元の blob `206f723` と一致）。
+置き場所は `src/` のままにした（ビルド設定の include パスを変えずに済む）。
 
-ヘッダの注記のうち YMEngine 固有で、本エンジンに当てはまらないもの: `FmEngine_SetMemory` の
-「data は複製せず参照する」「チップからの書き込みは捨てる」、`FmEngine_GetMemorySize` の
-「割り当てたブロックの大きさの合計」。本エンジンは外部メモリを持たず、`SetMemory` は常に
-`FM_ERR_UNAVAILABLE`、`GetMemorySize` は常に 0。写しの規則に従い、ヘッダは直さない。
+ヘッダの写し元は `7d8ed2d` まで madscient/YMEngine の `src/FmEngineApi.h` だった。`20c4923` で
+正本が FMEngineTest に移り、特定のエンジンに依らない書き方になった。
 
 ## §2 2026-10-02 FmEngineApi の改訂への追随
+
+この節は FMEngineTest `866f4a3`・YMEngine `7d8ed2d` の時点の記録。部位ゲインと外部メモリの
+関数の形は §4 で変わっている。
 
 読んだ改訂: FMEngineTest の `e39b206`（部位ゲイン）、`e002890`・`c0589c1`（外部メモリの割り当て）、
 `866f4a3`（clock=0 の廃止）。FMEngineTest の `docs/CHANGELOG.md` は、本リポジトリ `4173159` を
@@ -126,3 +129,72 @@ clock が必須になり、呼び出し側が必ずクロックを選ぶよう�
 3. チップごとに、`Write` と `GenerateMany` の直前で `SetClockRate` を呼んでテーブルを切り替え、
    プロセス全体の mutex で囲む（`SetClockRate` はクロックが前回と同じならテーブルを作り直さない）
 4. SAASound 側を直す（submodule の改造、または upstream への提案）
+
+## §4 2026-10-03 FmEngineApi の改訂（名前での指定）への追随
+
+読んだ改訂: FMEngineTest `20c4923`。部位と外部メモリを名前の文字列で指定する形になり、
+`FmPart`・`FmEngine_GetPartMask`・`FmMemoryType`・`FmEngine_GetMemorySize` が無くなった。
+外部メモリの関数は任意の組になり、必須シンボルは 14 個から 12 個になった。ヘッダの正本は
+FMEngineTest の `include/FmEngineApi.h` に移った（§1）。
+
+### 4.1 ヘッダを写し直す
+
+`src/FmEngineApi.h` を FMEngineTest `20c4923` の `include/FmEngineApi.h` の写しにした。
+
+### 4.2 外部メモリの関数のエクスポートをやめる
+
+- 根拠: FMEngineTest の `docs/CHANGELOG.md`（`20c4923`）の「エンジンとアプリケーション側の対応」が、
+  本エンジンを含むスタブの 5 本に「外部メモリの関数のエクスポートをやめる」を求めている。
+  仕様書は「`FmEngine_GetMemoryCount` を持たずに `FmEngine_SetMemory` をエクスポートする DLL は、
+  この仕様と互換性がない」とする
+- 実装: `FmEngine_SetMemory`（常に `FM_ERR_UNAVAILABLE`）と `FmEngine_GetMemorySize`（常に 0）を
+  消した。新しい呼び出し側は、`FmEngine_GetMemoryCount` が無い DLL を、外部メモリを持たない
+  エンジンとして扱う
+- 利用者の決定（2026-10-03）: エクスポートをやめる。対応前の呼び出し側からロードできなくなる
+  ことは問題にしない
+- 前提: 呼び出し側が `FmEngine_GetMemoryCount` の有無で判定すること（`20c4923` の仕様）。
+  アプリケーション側も並行して追随すること（利用者による）
+- 影響: `FmEngine_SetMemory` を必須として読み込む呼び出し側は、この DLL をロードできなくなる
+  - **確認済み**: FMEngineTest `866f4a3` は `FmEngine_SetMemory not found in DLL` でロードに
+    失敗する（§4.4）
+  - **未検証**（ソースを読んだだけで、動かしていない）: madscient/FitomEmuIF `75d9542` は
+    `FmEngine_SetMemory` が無いと例外を投げ、madscient/Y8960Sequencer `13050cb` はライブラリの
+    open を失敗にする。FMEngineTest の CHANGELOG は、この 2 つを「`FmEngine_SetMemory` を必須
+    として読むのをやめる」対応が要るアプリケーションに挙げている
+- 見送った案: 外部メモリの 3 関数を組で、スタブとしてエクスポートする（`GetMemoryCount` は 0、
+  `GetMemoryName` は NULL、`SetMemory` はどの名前にも `FM_ERR_INVALID_ARG`）。これも仕様に
+  準拠する。見送った理由: 仕様の CHANGELOG がスタブのエンジンにエクスポートをやめることを
+  求めており、利用者が互換性を保つ必要は無いとした。この案なら `FmEngine_SetMemory` のシンボルが残るので、それだけを必須として読む
+  対応前の呼び出し側（上の FitomEmuIF と Y8960Sequencer）からもロードできる見込みだが、
+  **未検証**。`FmEngine_GetMemorySize` も必須とする FMEngineTest `866f4a3` 以前は、どちらの
+  案でもロードできない
+- やり直しの値段: スタブで残す案に変えるのは、`src/SAASoundEngine.cpp` に 3 関数（20 行ほど）と、
+  `README.md` の「任意シンボル」の行、この節
+
+### 4.3 部位ゲインは引き続きエクスポートしない
+
+仕様は、`FmEngine_GetPartCount` が無い DLL を「どのチップも部位を持たない」ものとして扱う。
+SAA1099 は仕様の部位の表に無い。§2.2 の判断と同じで、関数の形が変わっただけ。
+
+### 4.4 確認
+
+**確認済み**（MSVC 19.51 で、変更前 `ca97218` と変更後の DLL をビルドし、§2.5 と同じ使い捨ての
+ハーネスを新しいヘッダに合わせて直して叩いた。ハーネスはリポジトリに入れていない）:
+
+- 「外部メモリの 4 シンボルをエクスポートしていない」「廃止された 2 シンボル
+  （`GetMemorySize`、`GetPartMask`）をエクスポートしていない」の 2 項目が、変更前の DLL で落ち、
+  変更後の DLL で通った。変更後は必須 12 シンボルがあり、部位ゲインの 4 シンボルが無い
+- clock の検査（§2.5 と同じ 9 項目）は、変更前・変更後とも通った
+- clock=8,000,000 で鳴らした出力（float、約 2 秒）が、変更前と変更後でバイト一致。
+  §2.5 で書き出したものとも一致
+- FMEngineTest `20c4923` をビルドし（configure で「header and spec list the same 20 symbols」）、
+  `saa.json` を WAV に書き出した。変更前の DLL と変更後の DLL の WAV がバイト一致し、§2.5 の
+  WAV とも一致。どちらの DLL でも `FmEngine_GetMemoryCount is not exported: ROM files will not
+  be loaded.` が 1 行出る
+- FMEngineTest `866f4a3` は、変更後の DLL を `FmEngine_SetMemory not found in DLL` でロード
+  できず、変更前の DLL はロードできる
+
+**未検証**:
+
+- Linux / macOS でのビルド、`NMakefile` でのビルド（CMake の NMake ジェネレータでだけビルドした）
+- FMEngineTest `20c4923` のリアルタイム再生（WAV への書き出しだけを走らせた）

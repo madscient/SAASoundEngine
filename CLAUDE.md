@@ -14,10 +14,10 @@
 
 ## 規則
 
-- **`src/FmEngineApi.h` は madscient/YMEngine の `src/FmEngineApi.h` の写し。** 中身を直接
-  直さない。API の仕様の正は madscient/FMEngineTest の `docs/FmEngineApi.md`。改訂されたら
-  両方を見て写し直し、エンジンを追随させ、写したコミットを `doc/plan.md` §1 に書く。
-  ヘッダのコメントには写し元のエンジン固有の記述が混ざるので、このエンジン固有の振る舞いは
+- **`src/FmEngineApi.h` は madscient/FMEngineTest の `include/FmEngineApi.h` の写し。** 中身を
+  直接直さない。API の仕様の正は同じリポジトリの `docs/FmEngineApi.md`、各エンジンに求める
+  対応は `docs/CHANGELOG.md` にある。改訂されたら 3 つを見て写し直し、エンジンを追随させ、
+  写したコミットを `doc/plan.md` §1 に書く。このエンジン固有の振る舞いはヘッダではなく
   `README.md` の「設計メモ」に書く
 - **公開リポジトリである。** ローカルのパスや個人の情報を成果物・コミットメッセージに
   書かない。他のリポジトリは GitHub 上の名前とコミットで指す

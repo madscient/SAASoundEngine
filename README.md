@@ -83,6 +83,7 @@ FMEngineTest.exe -e SAASoundEngine.dll patches\saa.json
 FMEngineTest
 Loading engine: libSAASoundEngine.so
 Engine loaded.
+  FmEngine_GetMemoryCount is not exported: ROM files will not be loaded.
 
 Sample rate: 48000 Hz
 
@@ -104,8 +105,7 @@ Supported chips (1): SAA
 | 複数の SAA チップ | すべて同じクロックで使う (下記) |
 | ネイティブレート | `clock / 512` (8 MHz → 15625 Hz) |
 | `port` 引数 | 無視 (SAA1099 はポート概念なし) |
-| `SetMemory` / `GetMemorySize` | `FM_ERR_UNAVAILABLE` / 0 (外部メモリなし) |
-| 任意シンボル | 部位ゲイン (`FmEngine_SetPartGain` / `FmEngine_GetPartGain` / `FmEngine_GetPartMask`) と `FmEngine_SetMemoryEx` はエクスポートしない。SAA1099 は出力が 1 系統で、外部メモリを持たない |
+| 任意シンボル | 部位ゲイン (`FmEngine_GetPartCount` / `FmEngine_GetPartName` / `FmEngine_SetPartGain` / `FmEngine_GetPartGain`) と外部メモリ (`FmEngine_GetMemoryCount` / `FmEngine_GetMemoryName` / `FmEngine_SetMemory` / `FmEngine_SetMemoryEx`) はエクスポートしない。SAA1099 は出力が 1 系統で、外部メモリを持たない。これらを必須として読み込む呼び出し側からはロードできない |
 | バッファ変換 | `GenerateMany` の 16bit LE stereo interleaved → float32 deinterleaved |
 | `SAASound.cfg` | 存在しない場合はデフォルト値で動作 (ログ無効・highpass=on・boost=1) |
 
@@ -121,4 +121,4 @@ SAASound はトーンの周波数テーブルを DLL 全体で 1 つだけ持ち
 
 - **SAASoundEngine.cpp**: MIT
 - **SAASound** (`extern/SAASound`): 独自ライセンス ([LICENCE](extern/SAASound/LICENCE) 参照)
-- **FmEngineApi.h**: [YMEngine](https://github.com/madscient/YMEngine) の MIT ライセンスに準拠
+- **FmEngineApi.h**: [FMEngineTest](https://github.com/madscient/FMEngineTest) の MIT ライセンスに準拠

@@ -2,8 +2,8 @@
 // SAASound (SAA1099) の FmEngineApi ラッパー実装
 //
 //   - port 引数は無視する (SAA1099 にはポートの概念が無い)
-//   - 任意シンボル (部位ゲイン、FmEngine_SetMemoryEx) はエクスポートしない。
-//     SAA1099 は出力が 1 系統で、外部メモリのバスも無いため
+//   - 任意シンボル (部位ゲイン、外部メモリ) はエクスポートしない。
+//     SAA1099 は出力が 1 系統で、外部メモリを持たないため
 //   - SAASound の GenerateMany は 16bit signed LE stereo interleaved で出力するので、
 //     float32 の L/R 別バッファに変換する
 
@@ -218,22 +218,6 @@ FMENGINE_API FmResult FMENGINE_CALL FmEngine_GetGain(
     if (out_gain_l) *out_gain_l = eng->chips[chip_id].gain_l;
     if (out_gain_r) *out_gain_r = eng->chips[chip_id].gain_r;
     return FM_OK;
-}
-
-// =========================================================
-//  外部メモリ (SAA1099 は外部メモリなし)
-// =========================================================
-FMENGINE_API FmResult FMENGINE_CALL FmEngine_SetMemory(
-    FmEngineHandle /*engine*/, uint32_t /*chip_id*/,
-    FmMemoryType /*mem_type*/, const uint8_t* /*data*/, uint32_t /*size*/)
-{
-    return FM_ERR_UNAVAILABLE;
-}
-
-FMENGINE_API uint32_t FMENGINE_CALL FmEngine_GetMemorySize(
-    FmEngineHandle /*engine*/, uint32_t /*chip_id*/, FmMemoryType /*mem_type*/)
-{
-    return 0u;
 }
 
 // =========================================================
