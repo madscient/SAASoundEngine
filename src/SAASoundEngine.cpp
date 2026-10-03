@@ -23,6 +23,11 @@
 // =========================================================
 static const char* const kChipName  = "SAA";
 
+// 受け付ける唯一のクロック。SAASound はトーンの周波数テーブルを全インスタンスで共有し、
+// SetClockRate の後もノイズと未書き込みのオシレータに 8 MHz の値を残すので、
+// ほかのクロックのチップは正しく鳴らせない
+static const uint32_t    kSaaClock  = 8000000u;
+
 // =========================================================
 //  チップスロット
 // =========================================================
@@ -119,6 +124,8 @@ FMENGINE_API FmResult FMENGINE_CALL FmEngine_AddChip(
 
     if (std::string(name) != kChipName)
         return FM_ERR_UNKNOWN_CHIP;
+
+    if (clock != kSaaClock) return FM_ERR_INVALID_ARG;
 
     // SAASound オブジェクト作成
     LPCSAASOUND saa = CreateCSAASound();

@@ -101,19 +101,12 @@ Supported chips (1): SAA
 | 項目 | 内容 |
 |---|---|
 | 対応チップ | `"SAA"` のみ (SAA1099) |
-| クロック | `FmEngine_AddChip` の `clock` で必ず指定する。エンジンは既定のクロックを持たず、0 は `FM_ERR_INVALID_ARG` |
-| 複数の SAA チップ | すべて同じクロックで使う (下記) |
-| ネイティブレート | `clock / 512` (8 MHz → 15625 Hz) |
+| クロック | `FmEngine_AddChip` の `clock` には 8,000,000 を指定する。それ以外 (0 を含む) は `FM_ERR_INVALID_ARG`。SAASound が 8 MHz 以外のクロックを正しく扱えないため |
+| ネイティブレート | 15625 Hz (`clock / 512`) |
 | `port` 引数 | 無視 (SAA1099 はポート概念なし) |
 | 任意シンボル | 部位ゲイン (`FmEngine_GetPartCount` / `FmEngine_GetPartName` / `FmEngine_SetPartGain` / `FmEngine_GetPartGain`) と外部メモリ (`FmEngine_GetMemoryCount` / `FmEngine_GetMemoryName` / `FmEngine_SetMemory` / `FmEngine_SetMemoryEx`) はエクスポートしない。SAA1099 は出力が 1 系統で、外部メモリを持たない。これらを必須として読み込む呼び出し側からはロードできない |
 | バッファ変換 | `GenerateMany` の 16bit LE stereo interleaved → float32 deinterleaved |
 | `SAASound.cfg` | 存在しない場合はデフォルト値で動作 (ログ無効・highpass=on・boost=1) |
-
-### 複数の SAA チップのクロック
-
-SAASound はトーンの周波数テーブルを DLL 全体で 1 つだけ持ちます。そのため、クロックの違う SAA チップを使うと、すべてのチップのトーンの音程が、最後に追加したチップのクロックに従います。別のエンジン (`FmEngine_Create` で作ったハンドル) に追加したチップも同じです。
-
-複数の SAA チップを使うときは、すべて同じクロックを指定してください。
 
 ---
 
